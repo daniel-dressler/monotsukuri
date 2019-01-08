@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
 extern crate clap;
+extern crate ini;
 
+use ini::Ini;
 use clap::{Arg, App};
 
 enum TargetPlatform {
@@ -19,10 +21,18 @@ enum FileSyncMode {
 	Stale,
 }
 
-struct Config {
+enum BuildMode {
+	Dev,
+	Release,
+}
+
+
+
+struct Instructions {
 	// Modes
 	platform: TargetPlatform,
 	filesync: FileSyncMode,
+	buildmode: BuildMode,
 
 	// Flags
 	is_patch: bool,
@@ -31,7 +41,7 @@ struct Config {
 	destination: String,
 }
 
-fn parse_config() -> Config {
+fn parse_instrctions() -> Instructions {
     let matches = App::new("Monotsukuri")
         .version("0.1.0")
         .author("Daniel Dressler <danieru.dressler@gmail.com")
@@ -70,13 +80,58 @@ fn parse_config() -> Config {
 	// Patch
 	let is_patch = matches.value_of("patch") != None;
 
+	// Build Mode
+	let mut buildmode = BuildMode::Dev;
+	if matches.value_of("release") != None {
+		buildmode = BuildMode::Release;
+	}
+
 	// Destination
 	let destination = "".to_string();
 
-	return Config {platform, filesync, is_patch, destination};
+	return Instructions {platform, filesync, buildmode, is_patch, destination};
+}
+
+struct Config {
+	// Dropbox
+	dropbox_folder: String,
+
+	// SDKs
+	nintendo_sdk_folder: String,
+	steam_sdk_folder: String,
+
+	// Unreal
+	ue_src_folder: String,
+
+}
+
+fn parse_config(instructions : &Instructions) -> Config {
+	let dropbox_folder = "".to_string();
+	let nintendo_sdk_folder = "".to_string();
+	let steam_sdk_folder = "".to_string();
+	let ue_src_folder = "".to_string();
+
+    let conf = Ini::load_from_file("conf.ini").unwrap();
+
+    let section = conf.section(Some("User".to_owned())).unwrap();
+    let tommy = section.get("given_name").unwrap();
+    let green = section.get("family_name").unwrap();
+
+	return Config { dropbox_folder, nintendo_sdk_folder, steam_sdk_folder, ue_src_folder };
+}
+
+fn prepare_environment(config : &Config) {
+
+	// Set environmental variables
+
 }
 
 fn main() {
-	let config = parse_config();
-	println!("{}", config.destination);
+	let instructions = parse_instrctions();
+
+	let config = parse_config(&instructions);
+
+	prepare_environment(&config);
+
+	println!("{}", instructions.destination);
 }

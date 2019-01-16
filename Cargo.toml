@@ -1,5 +1,5 @@
 [package]
-name = "monotsukuri"
+name = "monozukuri"
 version = "0.1.0"
 authors = ["Daniel Dressler <danieru.dressler@gmail.com>"]
 edition = "2018"

@@ -65,7 +65,7 @@ struct Instructions {
 }
 
 fn parse_instrctions() -> Instructions {
-    let matches = App::new("Monotsukuri")
+    let matches = App::new("Monozukuri")
         .version("0.1.0")
         .author("Daniel Dressler <danieru.dressler@gmail.com")
         .about("Commercial grade meta builder for UE4 game product packaging")
@@ -119,7 +119,7 @@ fn parse_instrctions() -> Instructions {
 
 fn parse_config(_instructions : &Instructions) -> Config {
 
-    let conf = Ini::load_from_file("monotsukuri.ini").unwrap();
+    let conf = Ini::load_from_file("monozukuri.ini").unwrap();
 
     let section = conf.section(Some("paths")).unwrap();
 
@@ -143,7 +143,7 @@ fn parse_config(_instructions : &Instructions) -> Config {
 }
 
 fn prepare_environment(instructions : &Instructions, config : &Config) {
-	info_time!("Preparing Environment");
+	print_time!("Preparing Environment");
 
 	// Set environmental variables
 
@@ -245,19 +245,14 @@ fn compute_args(instructions : &Instructions, config : &Config) -> Vec<String> {
 }
 
 fn execute_build(instructions : &Instructions, config : &Config) {
-	info_time!("Executing Build");
+	print_time!("Executing Build");
 
 	let mut build_path = config.ue_src_folder.to_owned();
 	build_path.push_str("/Engine/Build/BatchFiles/RunUAT.bat");
 
 	println!("Calling: {}", build_path);
 
-	// my $args = "-platform=$platform -cook -build -stage -distribution -SkipCookingEditorContent $compressArg -package ";
-	// my $runUat = "$ue4/Engine/Build/BatchFiles/RunUAT.bat";
-	// my $fullCall = "call $runUat BuildCookRun -project=\"$uproject\" $args $modeArgs $extraArgs";
-
 	let args = compute_args(instructions, config);
-
 	Command::new(build_path)
 		.args(args)
         .spawn()
@@ -267,6 +262,7 @@ fn execute_build(instructions : &Instructions, config : &Config) {
 }
 
 fn main() {
+	print_time!("All tasks");
 	let instructions = parse_instrctions();
 
 	let config = parse_config(&instructions);
@@ -274,6 +270,4 @@ fn main() {
 	prepare_environment(&instructions, &config);
 
 	execute_build(&instructions, &config);
-
-	println!("{}", instructions.destination);
 }

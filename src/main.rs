@@ -2,6 +2,8 @@
 
 extern crate clap;
 extern crate ini;
+#[macro_use]
+extern crate measure_time;
 
 use ini::Ini;
 use clap::{Arg, App};
@@ -56,6 +58,7 @@ struct Instructions {
 
 	// Flags
 	is_patch: bool,
+	is_shipping: bool,
 
 	// Derived
 	destination: String,
@@ -99,6 +102,7 @@ fn parse_instrctions() -> Instructions {
 
 	// Patch
 	let is_patch = matches.value_of("patch") != None;
+	let is_shipping = matches.value_of("ship") != None;
 
 	// Build Mode
 	let mut buildmode = BuildMode::Dev;
@@ -109,13 +113,13 @@ fn parse_instrctions() -> Instructions {
 	// Destination
 	let destination = "".to_string();
 
-	return Instructions {platform, filesync, buildmode, is_patch, destination};
+	return Instructions {platform, filesync, buildmode, is_patch, is_shipping, destination};
 }
 
 
 fn parse_config(_instructions : &Instructions) -> Config {
 
-    let conf = Ini::load_from_file("conf.ini").unwrap();
+    let conf = Ini::load_from_file("monotsukuri.ini").unwrap();
 
     let section = conf.section(Some("paths")).unwrap();
 
@@ -139,12 +143,14 @@ fn parse_config(_instructions : &Instructions) -> Config {
 }
 
 fn prepare_environment(instructions : &Instructions, config : &Config) {
+	info_time!("Preparing Environment");
 
 	// Set environmental variables
 
 	// Sync Project into ScratchArea
 	if instructions.filesync == FileSyncMode::Fresh {
 		// Delete old sync
+		fs::remove_dir_all(&config.scratch_folder).expect("Failed to delete scratch folder");
 	}
 
 	if instructions.filesync != FileSyncMode::Stale {
@@ -205,7 +211,7 @@ fn prepare_environment(instructions : &Instructions, config : &Config) {
 
 }
 
-fn compute_args(_instructions : &Instructions, config : &Config) -> Vec<String> {
+fn compute_args(instructions : &Instructions, config : &Config) -> Vec<String> {
 
 	// Find folder to run build from
 	// Prepare should have moved project into this scratch
@@ -215,22 +221,32 @@ fn compute_args(_instructions : &Instructions, config : &Config) -> Vec<String> 
 	project.push_str(&config.project_file);
 	project.push_str("\"");
 
+	// If Shipping mode
+	let mut shipping = "".to_string();
+	if instructions.is_shipping {
+		shipping.push_str(" -clientconfig=Shipping -serverconfig=Shipping ");
+	}
+
 	let args = vec![
 		"BuildCookRun".to_string(),
 		project,
-		"-platform=windows".to_string(),
+		"-platform=Win32".to_string(),
 		"-compile".to_string(),
 		"-cook".to_string(),
+		"-build".to_string(),
 		"-stage".to_string(),
 		"-distribution".to_string(),
 		"-SkipCookingEditorContent".to_string(),
 		"-package".to_string(),
+		shipping,
 	];
 
 	return args;
 }
 
 fn execute_build(instructions : &Instructions, config : &Config) {
+	info_time!("Executing Build");
+
 	let mut build_path = config.ue_src_folder.to_owned();
 	build_path.push_str("/Engine/Build/BatchFiles/RunUAT.bat");
 

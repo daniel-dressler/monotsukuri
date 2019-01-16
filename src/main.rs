@@ -107,18 +107,22 @@ struct Config {
 }
 
 fn parse_config(instructions : &Instructions) -> Config {
-	let dropbox_folder = "".to_string();
-	let nintendo_sdk_folder = "".to_string();
-	let steam_sdk_folder = "".to_string();
-	let ue_src_folder = "".to_string();
 
     let conf = Ini::load_from_file("conf.ini").unwrap();
 
-    let section = conf.section(Some("User".to_owned())).unwrap();
-    let tommy = section.get("given_name").unwrap();
-    let green = section.get("family_name").unwrap();
+    let section = conf.section(Some("paths")).unwrap();
 
-	return Config { dropbox_folder, nintendo_sdk_folder, steam_sdk_folder, ue_src_folder };
+	let dropbox_folder = section.get("dropbox").unwrap().to_string();
+	let nintendo_sdk_folder = section.get("nintendo_sdk").unwrap().to_string();
+	let steam_sdk_folder = section.get("steam_sdk").unwrap().to_string();
+	let ue_src_folder = section.get("ue").unwrap().to_string();
+
+	return Config {
+		dropbox_folder,
+		nintendo_sdk_folder,
+		steam_sdk_folder,
+		ue_src_folder
+	};
 }
 
 fn prepare_environment(config : &Config) {

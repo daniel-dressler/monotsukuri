@@ -5,6 +5,7 @@ extern crate ini;
 
 use ini::Ini;
 use clap::{Arg, App};
+use std::process::{Command, Stdio};
 
 enum TargetPlatform {
 	Windows,
@@ -126,12 +127,22 @@ fn prepare_environment(config : &Config) {
 
 }
 
+fn execute_build(instructions : &Instructions, config : &Config) {
+	let runUatPath = config.ue_src_folder + "/Engine/Build/BatchFiles/RunUAT.bat";
+	Command::new(runUatPath)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .spawn();
+}
+
 fn main() {
 	let instructions = parse_instrctions();
 
 	let config = parse_config(&instructions);
 
 	prepare_environment(&config);
+
+	execute_build(&instructions, &config);
 
 	println!("{}", instructions.destination);
 }

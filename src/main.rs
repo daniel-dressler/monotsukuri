@@ -88,6 +88,10 @@ fn parse_instrctions() -> Instructions {
     let platform_raw = matches.value_of("PLATFORM").unwrap().to_lowercase();
 	let platform = match platform_raw.as_ref() {
 		"windows" => TargetPlatform::Windows,
+		"win" => TargetPlatform::Windows,
+		"ps4" => TargetPlatform::PS4,
+		"switch" => TargetPlatform::Switch,
+		"xbox" => TargetPlatform::XboxOne,
 		_ => TargetPlatform::Windows,
 	};
 
@@ -211,6 +215,18 @@ fn prepare_environment(instructions : &Instructions, config : &Config) {
 
 }
 
+fn get_platform_name(instructions : &Instructions) -> &str {
+	let name = match instructions.platform {
+		TargetPlatform::Windows => "win32",
+		TargetPlatform::PS4 => "ps4",
+		TargetPlatform::Switch => "switch",
+		TargetPlatform::XboxOne => "xbox",
+		_ => "win32"
+	};
+
+	return name;
+}
+
 fn compute_args(instructions : &Instructions, config : &Config) -> Vec<String> {
 
 	// Find folder to run build from
@@ -227,10 +243,13 @@ fn compute_args(instructions : &Instructions, config : &Config) -> Vec<String> {
 		shipping.push_str(" -clientconfig=Shipping -serverconfig=Shipping ");
 	}
 
+	let mut platform_arg = "-platform=".to_string();
+	platform_arg.push_str(get_platform_name(instructions));
+
 	let args = vec![
 		"BuildCookRun".to_string(),
 		project,
-		"-platform=Win32".to_string(),
+		platform_arg,
 		"-compile".to_string(),
 		"-cook".to_string(),
 		"-build".to_string(),

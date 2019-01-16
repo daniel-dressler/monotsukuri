@@ -5,7 +5,8 @@ extern crate ini;
 
 use ini::Ini;
 use clap::{Arg, App};
-use std::process::{Command, Stdio};
+use std::process::Command;
+use std::fs;
 
 enum TargetPlatform {
 	Windows,
@@ -16,6 +17,7 @@ enum TargetPlatform {
 	Linux,
 }
 
+#[derive(PartialEq)]
 enum FileSyncMode {
 	Fresh,
 	Quick,
@@ -28,6 +30,23 @@ enum BuildMode {
 }
 
 
+struct Config {
+	// Project
+	project_folder: String,
+	project_file: String,
+	scratch_folder: String,
+
+	// Dropbox
+	dropbox_folder: String,
+
+	// SDKs
+	nintendo_sdk_folder: String,
+	steam_sdk_folder: String,
+
+	// Unreal
+	ue_src_folder: String,
+
+}
 
 struct Instructions {
 	// Modes
@@ -93,20 +112,8 @@ fn parse_instrctions() -> Instructions {
 	return Instructions {platform, filesync, buildmode, is_patch, destination};
 }
 
-struct Config {
-	// Dropbox
-	dropbox_folder: String,
 
-	// SDKs
-	nintendo_sdk_folder: String,
-	steam_sdk_folder: String,
-
-	// Unreal
-	ue_src_folder: String,
-
-}
-
-fn parse_config(instructions : &Instructions) -> Config {
+fn parse_config(_instructions : &Instructions) -> Config {
 
     let conf = Ini::load_from_file("conf.ini").unwrap();
 
@@ -116,27 +123,131 @@ fn parse_config(instructions : &Instructions) -> Config {
 	let nintendo_sdk_folder = section.get("nintendo_sdk").unwrap().to_string();
 	let steam_sdk_folder = section.get("steam_sdk").unwrap().to_string();
 	let ue_src_folder = section.get("ue").unwrap().to_string();
+	let project_folder = section.get("project").unwrap().to_string();
+	let project_file = section.get("project_file").unwrap().to_string();
+	let scratch_folder = section.get("scratch").unwrap().to_string();
 
 	return Config {
+		project_folder,
+		project_file,
+		scratch_folder,
 		dropbox_folder,
 		nintendo_sdk_folder,
 		steam_sdk_folder,
-		ue_src_folder
+		ue_src_folder,
 	};
 }
 
-fn prepare_environment(config : &Config) {
+fn prepare_environment(instructions : &Instructions, config : &Config) {
 
 	// Set environmental variables
 
+	// Sync Project into ScratchArea
+	if instructions.filesync == FileSyncMode::Fresh {
+		// Delete old sync
+	}
+
+	if instructions.filesync != FileSyncMode::Stale {
+		// Decide Folders to Sync
+		let mut sync_folders = vec![
+			"Build".to_string(),
+			"Config".to_string(),
+			"Content".to_string(),
+			"Source".to_string(),
+			"Saved/Logs".to_string()
+		];
+
+		if instructions.is_patch {
+			sync_folders.push("Releases".to_string());
+		}
+
+		for folder in &sync_folders {
+			let mut src = config.project_folder.to_string();
+			src.push_str("/");
+			src.push_str(&folder);
+
+			let mut dest = config.scratch_folder.to_string();
+			dest.push_str("/");
+			dest.push_str(&folder);
+
+			Command::new("robocopy")
+				.arg(src)
+				.arg(dest)
+				.arg("/MIR")
+				.arg("/Z")
+				.arg("/UNICODE")
+				.arg("/NFL")
+				.arg("/NDL")
+		        .spawn()
+				.expect("Failed to run Robocopy")
+				.wait()
+				.expect("Failed to finish Robocopy");
+		}
+
+		// Copy Files
+		// Note: Robocopy expects to sync folders
+		// it has weird syntax for a single file
+		let sync_files = vec![
+			config.project_file.to_string()
+		];
+		for file in &sync_files {
+			let mut src = config.project_folder.to_string();
+			src.push_str("/");
+			src.push_str(&file);
+
+			let mut dest = config.scratch_folder.to_string();
+			dest.push_str("/");
+			dest.push_str(&file);
+
+			fs::copy(src, dest).expect("File copy failed");
+		}
+	}
+
+}
+
+fn compute_args(_instructions : &Instructions, config : &Config) -> Vec<String> {
+
+	// Find folder to run build from
+	// Prepare should have moved project into this scratch
+	let mut project = "-project=\"".to_string();
+	project.push_str(&config.scratch_folder);
+	project.push_str("/");
+	project.push_str(&config.project_file);
+	project.push_str("\"");
+
+	let args = vec![
+		"BuildCookRun".to_string(),
+		project,
+		"-platform=windows".to_string(),
+		"-compile".to_string(),
+		"-cook".to_string(),
+		"-stage".to_string(),
+		"-distribution".to_string(),
+		"-SkipCookingEditorContent".to_string(),
+		"-package".to_string(),
+	];
+
+	return args;
 }
 
 fn execute_build(instructions : &Instructions, config : &Config) {
-	let runUatPath = config.ue_src_folder + "/Engine/Build/BatchFiles/RunUAT.bat";
-	Command::new(runUatPath)
-        .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .spawn();
+	let mut build_path = config.ue_src_folder.to_owned();
+	build_path.push_str("/Engine/Build/BatchFiles/RunUAT.bat");
+
+	println!("Calling: {}", build_path);
+
+	// my $args = "-platform=$platform -cook -build -stage -distribution -SkipCookingEditorContent $compressArg -package ";
+	// my $runUat = "$ue4/Engine/Build/BatchFiles/RunUAT.bat";
+	// my $fullCall = "call $runUat BuildCookRun -project=\"$uproject\" $args $modeArgs $extraArgs";
+
+	let args = compute_args(instructions, config);
+
+	Command::new(build_path)
+		.args(args)
+        .spawn()
+		.expect("Failed to RunUAT build")
+		.wait()
+		.expect("Build failed");
 }
 
 fn main() {
@@ -144,7 +255,7 @@ fn main() {
 
 	let config = parse_config(&instructions);
 
-	prepare_environment(&config);
+	prepare_environment(&instructions, &config);
 
 	execute_build(&instructions, &config);
 
